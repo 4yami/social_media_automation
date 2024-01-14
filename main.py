@@ -73,7 +73,7 @@ class MainWindow(QMainWindow):
         self.previous_button = self.create_button(right_layout, 'Previous', self.show_previous)
         
         self.current_index = 0
-        self.picture_paths = []
+        self.image_paths = []
         
         # Initialize viewer state
         self.reset_viewer_state()
@@ -146,31 +146,31 @@ class MainWindow(QMainWindow):
 
         if file_dialog.exec_():
             selected_files = file_dialog.selectedFiles()
-            self.picture_paths.extend(selected_files)
-            self.show_picture()
+            self.image_paths.extend(selected_files)
+            self.show_image()
 
     def remove_image(self):
-        if self.picture_paths:
-            self.picture_paths.pop(self.current_index)
-            if not self.picture_paths:
+        if self.image_paths:
+            self.image_paths.pop(self.current_index)
+            if not self.image_paths:
                 self.reset_viewer_state()
             else:
-                self.current_index = min(self.current_index, len(self.picture_paths) - 1)
-            self.show_picture()
+                self.current_index = min(self.current_index, len(self.image_paths) - 1)
+            self.show_image()
 
     def show_previous(self):
-        if self.picture_paths:
-            self.current_index = (self.current_index - 1) % len(self.picture_paths)
-            self.show_picture()
+        if self.image_paths:
+            self.current_index = (self.current_index - 1) % len(self.image_paths)
+            self.show_image()
 
     def show_next(self):
-        if self.picture_paths:
-            self.current_index = (self.current_index + 1) % len(self.picture_paths)
-            self.show_picture()
+        if self.image_paths:
+            self.current_index = (self.current_index + 1) % len(self.image_paths)
+            self.show_image()
 
-    def show_picture(self):
-        if self.picture_paths:
-            pixmap = QPixmap(self.picture_paths[self.current_index])
+    def show_image(self):
+        if self.image_paths:
+            pixmap = QPixmap(self.image_paths[self.current_index])
             scaled_pixmap = pixmap.scaled(
                 self.image_label.size(), 
                 aspectMode=Qt.KeepAspectRatio, 
@@ -178,7 +178,7 @@ class MainWindow(QMainWindow):
             )
             self.image_label.setPixmap(scaled_pixmap)
             self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.indicator_label.setText(f"Picture {self.current_index + 1}/{len(self.picture_paths)}")
+            self.indicator_label.setText(f"image {self.current_index + 1}/{len(self.image_paths)}")
 
     
     def reset_viewer_state(self):
@@ -188,7 +188,7 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super(MainWindow, self).resizeEvent(event)
-        self.show_picture()
+        self.show_image()
 
 def main():
     app = QApplication(sys.argv)
