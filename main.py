@@ -2,11 +2,14 @@ import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QLineEdit, QPushButton, QListWidget, QTextEdit, QHBoxLayout, QFrame, QFileDialog, QSizePolicy
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
+import threading
+from facebook2 import post_fb
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
         self.setWindowTitle("Social Media Automation")
+        self.groups_list_item = []
         self.init_ui()
 
     def init_ui(self):
@@ -71,6 +74,7 @@ class MainWindow(QMainWindow):
         self.remove_image_button = self.create_button(right_layout, 'Remove Image', self.remove_image)
         self.next_button = self.create_button(right_layout, 'Next', self.show_next)
         self.previous_button = self.create_button(right_layout, 'Previous', self.show_previous)
+        self.post_button = self.create_button(right_layout, 'Post', self.on_post_button_click)
         
         self.current_index = 0
         self.image_paths = []
@@ -115,8 +119,13 @@ class MainWindow(QMainWindow):
             try:
                 self.groups_list.addItem(new_link)
                 self.groups_input.clear()
+                self.get_groups_list_item()
             except Exception as e:
                 print(f"Error: {e}")
+                
+    def get_groups_list_item(self):
+        self.groups_list_item = [self.groups_list.item(i).text() for i in range(self.groups_list.count())]
+        return self.groups_list_item
     
     def edit_link(self):
         selected_item = self.groups_list.currentItem()
@@ -135,16 +144,17 @@ class MainWindow(QMainWindow):
         if selected_item:
             try:
                 self.groups_list.takeItem(self.groups_list.row(selected_item))
+                self.get_groups_list_item()
             except Exception as e:
                 print(f"Error: {e}")
                 
-    # ///// new function no use yet
+    # Image function
     def select_image(self):
         file_dialog = QFileDialog(self)
         file_dialog.setNameFilter("Images (*.png *.jpg *.jpeg *.bmp)")
         file_dialog.setFileMode(QFileDialog.ExistingFiles)
 
-        if file_dialog.exec_():
+        if file_dialog.exec():
             selected_files = file_dialog.selectedFiles()
             self.image_paths.extend(selected_files)
             self.show_image()
@@ -159,14 +169,12 @@ class MainWindow(QMainWindow):
             self.show_image()
 
     def show_previous(self):
-        if self.image_paths:
-            self.current_index = (self.current_index - 1) % len(self.image_paths)
-            self.show_image()
+        self.current_index = (self.current_index - 1) % len(self.image_paths)
+        self.show_image()
 
     def show_next(self):
-        if self.image_paths:
-            self.current_index = (self.current_index + 1) % len(self.image_paths)
-            self.show_image()
+        self.current_index = (self.current_index + 1) % len(self.image_paths)
+        self.show_image()
 
     def show_image(self):
         if self.image_paths:
@@ -178,9 +186,10 @@ class MainWindow(QMainWindow):
             )
             self.image_label.setPixmap(scaled_pixmap)
             self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.indicator_label.setText(f"image {self.current_index + 1}/{len(self.image_paths)}")
-
-    
+            def update_indicator_label():
+                self.indicator_label.setText(f"image {self.current_index + 1}/{len(self.image_paths)}")
+            update_indicator_label()
+            
     def reset_viewer_state(self):
         self.current_index = 0
         self.image_label.clear()
@@ -189,12 +198,32 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super(MainWindow, self).resizeEvent(event)
         self.show_image()
+ 
+    # posting function
+    def on_post_button_click(self):
+        """Callback for the 'Start Post' button click."""
+        self.email = self.email_input.text()
+        self.password = self.password_input.text()
+        self.group = self.get_groups_list_item()
+        self.post_text = self.post_text_text_edit.toPlainText()
+        # self.save_to_file(self.email, self.password, self.group)
+
+        thread = threading.Thread(target=self.post_to_facebook, args=(self.email, self.password, self.group, self.post_text))
+        thread.start()
+
+    def post_to_facebook(self, email, password, group, post_text):
+        """Posts to Facebook with provided credentials and text."""
+        try:
+            post_fb(fb_email=email, fb_password=password, fb_group=group, fb_post_text=post_text)
+        except Exception as e:
+            print(f"Error occurred while posting: {e}")
+            # Consider using logging for more detailed error handling
 
 def main():
     app = QApplication(sys.argv)
     window = MainWindow()
     window.showMaximized()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()
