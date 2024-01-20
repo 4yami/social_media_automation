@@ -10,6 +10,8 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
         self.setWindowTitle("Social Media Automation")
         self.groups_list_item = []
+        self.current_images_index = 0
+        self.images_path_list = []
         self.init_ui()
 
     def init_ui(self):
@@ -31,11 +33,11 @@ class MainWindow(QMainWindow):
         # Create labels, text inputs, buttons, and list for the left layout
         self.title_label = self.create_label(left_layout, 'FACEBOOK')
         self.email_label = self.create_label(left_layout, 'Email:')
-        self.email_input = self.create_text_input(left_layout)
+        self.email_input = self.create_text_input(left_layout, False, 'scowhp@gmail.com')
         self.password_label = self.create_label(left_layout, 'Password:')
-        self.password_input = self.create_text_input(left_layout, is_password=True)
+        self.password_input = self.create_text_input(left_layout, True, 'fre3flip1ng')
         self.groups_label = self.create_label(left_layout, 'Groups URL:')
-        self.groups_input = self.create_text_input(left_layout)
+        self.groups_input = self.create_text_input(left_layout, False, 'https://www.facebook.com/groups/bobyss')
         self.groups_button = self.create_button(left_layout, 'Add URL', self.add_link)
         self.groups_list = self.create_list(left_layout)
 
@@ -66,7 +68,7 @@ class MainWindow(QMainWindow):
         self.indicator_label.setMinimumHeight(10)
         size_policy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.indicator_label.setSizePolicy(size_policy)
-        right_layout.addWidget(self.indicator_label)  # Use right_layout here
+        right_layout.addWidget(self.indicator_label)
 
         
         # Right layout button
@@ -75,12 +77,10 @@ class MainWindow(QMainWindow):
         self.next_button = self.create_button(right_layout, 'Next', self.show_next)
         self.previous_button = self.create_button(right_layout, 'Previous', self.show_previous)
         self.post_button = self.create_button(right_layout, 'Post', self.on_post_button_click)
-        
-        self.current_index = 0
-        self.image_paths = []
-        
+            
         # Initialize viewer state
         self.reset_viewer_state()
+        
         
     # UI functions
     def create_label(self, layout, text):
@@ -88,8 +88,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(label)
         return label
         
-    def create_text_input(self, layout, is_password=False):
+    def create_text_input(self, layout, is_password=False, set_text=""):
         text_input = QLineEdit()
+        text_input.setText(set_text)
         if is_password:
             text_input.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addWidget(text_input)
@@ -110,6 +111,7 @@ class MainWindow(QMainWindow):
         text_edit = QTextEdit()
         layout.addWidget(text_edit)
         return text_edit
+
 
     # Functions
     def add_link(self):
@@ -147,6 +149,7 @@ class MainWindow(QMainWindow):
                 self.get_groups_list_item()
             except Exception as e:
                 print(f"Error: {e}")
+             
                 
     # Image function
     def select_image(self):
@@ -156,29 +159,29 @@ class MainWindow(QMainWindow):
 
         if file_dialog.exec():
             selected_files = file_dialog.selectedFiles()
-            self.image_paths.extend(selected_files)
+            self.images_path_list.extend(selected_files)
             self.show_image()
 
     def remove_image(self):
-        if self.image_paths:
-            self.image_paths.pop(self.current_index)
-            if not self.image_paths:
+        if self.images_path_list:
+            self.images_path_list.pop(self.current_images_index)
+            if not self.images_path_list:
                 self.reset_viewer_state()
             else:
-                self.current_index = min(self.current_index, len(self.image_paths) - 1)
+                self.current_images_index = min(self.current_images_index, len(self.images_path_list) - 1)
             self.show_image()
 
     def show_previous(self):
-        self.current_index = (self.current_index - 1) % len(self.image_paths)
+        self.current_images_index = (self.current_images_index - 1) % len(self.images_path_list)
         self.show_image()
 
     def show_next(self):
-        self.current_index = (self.current_index + 1) % len(self.image_paths)
+        self.current_images_index = (self.current_images_index + 1) % len(self.images_path_list)
         self.show_image()
 
     def show_image(self):
-        if self.image_paths:
-            pixmap = QPixmap(self.image_paths[self.current_index])
+        if self.images_path_list:
+            pixmap = QPixmap(self.images_path_list[self.current_images_index])
             scaled_pixmap = pixmap.scaled(
                 self.image_label.size(), 
                 aspectMode=Qt.KeepAspectRatio, 
@@ -187,17 +190,18 @@ class MainWindow(QMainWindow):
             self.image_label.setPixmap(scaled_pixmap)
             self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             def update_indicator_label():
-                self.indicator_label.setText(f"image {self.current_index + 1}/{len(self.image_paths)}")
+                self.indicator_label.setText(f"image {self.current_images_index + 1}/{len(self.images_path_list)}")
             update_indicator_label()
             
     def reset_viewer_state(self):
-        self.current_index = 0
+        self.current_images_index = 0
         self.image_label.clear()
         self.indicator_label.clear()
 
     def resizeEvent(self, event):
         super(MainWindow, self).resizeEvent(event)
         self.show_image()
+ 
  
     # posting function
     def on_post_button_click(self):
@@ -206,18 +210,20 @@ class MainWindow(QMainWindow):
         self.password = self.password_input.text()
         self.group = self.get_groups_list_item()
         self.post_text = self.post_text_text_edit.toPlainText()
+        self.converted_images_path = [path.replace('\\', '\\\\') for path in self.images_path_list]
         # self.save_to_file(self.email, self.password, self.group)
 
-        thread = threading.Thread(target=self.post_to_facebook, args=(self.email, self.password, self.group, self.post_text))
+        thread = threading.Thread(target=self.post_to_facebook, args=(self.email, self.password, self.group, self.post_text, self.converted_images_path))
         thread.start()
 
-    def post_to_facebook(self, email, password, group, post_text):
+    def post_to_facebook(self, email, password, group, post_text, converted_images_path):
         """Posts to Facebook with provided credentials and text."""
         try:
-            post_fb(fb_email=email, fb_password=password, fb_group=group, fb_post_text=post_text)
+            post_fb(fb_email=email, fb_password=password, fb_group=group, fb_post_text=post_text, fb_files_path=converted_images_path)
         except Exception as e:
             print(f"Error occurred while posting: {e}")
             # Consider using logging for more detailed error handling
+
 
 def main():
     app = QApplication(sys.argv)
