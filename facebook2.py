@@ -56,9 +56,6 @@ def post_to_group(driver, group_url, post_text, files_path=[]):
             EC.element_to_be_clickable((By.XPATH, "//span[text()='Post']"))
         )
         post_span.click()
-        fb_waiting_post = WebDriverWait(driver, 30).until(
-            EC.element_to_be_clickable((By.XPATH, "//span[text()='Write something...']"))
-        )
         # Wait for the post to appear in the feed
         WebDriverWait(driver, 30).until(
             lambda driver: post_text in driver.page_source
@@ -84,7 +81,7 @@ def show_confirmation_box(driver):
             EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Check your notifications on another device')]"))
         )
         if login_notification:
-            result = messagebox.askyesno("Confirmation: Press 'YES' after confirming your login and 'NO' to close.")
+            result = messagebox.askyesno("Confirmation", "Press 'YES' after confirming your login and 'NO' to close.")
             if result:
                 pass # Perform actions if the user clicks 'Yes'
             else:

@@ -4,6 +4,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 import threading
 from facebook2 import post_fb
+import json
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -13,6 +15,9 @@ class MainWindow(QMainWindow):
         self.current_images_index = 0
         self.images_path_list = []
         self.init_ui()
+        
+    
+
 
     def init_ui(self):
         central_widget = QWidget()
@@ -33,11 +38,11 @@ class MainWindow(QMainWindow):
         # Create labels, text inputs, buttons, and list for the left layout
         self.title_label = self.create_label(left_layout, 'FACEBOOK')
         self.email_label = self.create_label(left_layout, 'Email:')
-        self.email_input = self.create_text_input(left_layout, False, 'scowhp@gmail.com')
+        self.email_input = self.create_text_input(left_layout, False)
         self.password_label = self.create_label(left_layout, 'Password:')
-        self.password_input = self.create_text_input(left_layout, True, 'fre3flip1ng')
+        self.password_input = self.create_text_input(left_layout, True)
         self.groups_label = self.create_label(left_layout, 'Groups URL:')
-        self.groups_input = self.create_text_input(left_layout, False, 'https://www.facebook.com/groups/bobyss')
+        self.groups_input = self.create_text_input(left_layout, False)
         self.groups_button = self.create_button(left_layout, 'Add URL', self.add_link)
         self.groups_list = self.create_list(left_layout)
 
@@ -77,9 +82,14 @@ class MainWindow(QMainWindow):
         self.next_button = self.create_button(right_layout, 'Next', self.show_next)
         self.previous_button = self.create_button(right_layout, 'Previous', self.show_previous)
         self.post_button = self.create_button(right_layout, 'Post', self.on_post_button_click)
-            
+          
+          
+        # Call load_config at the beginning to load the saved configuration
+        self.load_config()
+          
         # Initialize viewer state
         self.reset_viewer_state()
+        
         
         
     # UI functions
@@ -88,9 +98,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(label)
         return label
         
-    def create_text_input(self, layout, is_password=False, set_text=""):
+    def create_text_input(self, layout, is_password=False):
         text_input = QLineEdit()
-        text_input.setText(set_text)
         if is_password:
             text_input.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addWidget(text_input)
@@ -202,9 +211,33 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).resizeEvent(event)
         self.show_image()
  
+    # save text function
+    def save_config(self):
+        config_data = {
+            'email': self.email_input.text(),
+            'password': self.password_input.text(),
+            'group': self.get_groups_list_item(),
+        }
+
+        with open('config.json', 'w') as config_file:
+            json.dump(config_data, config_file)
+
+    def load_config(self):
+        try:
+            with open('config.json', 'r') as config_file:
+                config_data = json.load(config_file)
+                self.email_input.setText(config_data.get('email', ''))
+                self.password_input.setText(config_data.get('password', ''))
+                
+                # Load group list
+                for link in config_data.get('group', []):
+                    self.groups_list.addItem(link)
+        except FileNotFoundError:
+            pass  # File not found, it's okay
  
     # posting function
     def on_post_button_click(self):
+        self.save_config()
         """Callback for the 'Start Post' button click."""
         self.email = self.email_input.text()
         self.password = self.password_input.text()
