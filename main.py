@@ -5,6 +5,7 @@ from PySide6.QtGui import QPixmap
 import threading
 from facebook2 import post_fb
 import json
+from cryptography.fernet import Fernet
 
 
 class MainWindow(QMainWindow):
@@ -215,7 +216,7 @@ class MainWindow(QMainWindow):
     def save_config(self):
         config_data = {
             'email': self.email_input.text(),
-            'password': self.password_input.text(),
+            'password': self.encrypt_password(self.password_input.text()).decode(),
             'group': self.get_groups_list_item(),
         }
 
@@ -227,13 +228,26 @@ class MainWindow(QMainWindow):
             with open('config.json', 'r') as config_file:
                 config_data = json.load(config_file)
                 self.email_input.setText(config_data.get('email', ''))
-                self.password_input.setText(config_data.get('password', ''))
-                
+                encrypted_password = config_data.get('password', '')
+                self.password_input.setText(self.decrypt_password(encrypted_password))
+
                 # Load group list
                 for link in config_data.get('group', []):
                     self.groups_list.addItem(link)
         except FileNotFoundError:
             pass  # File not found, it's okay
+ 
+    def encrypt_password(self, password):
+        key = b'aWe0iHTtueNIZY3VJuJwozExOOXCqCd-tUJAUK0KaWI='  # Replace with your secret key
+        cipher_suite = Fernet(key)
+        encrypted_password = cipher_suite.encrypt(password.encode())
+        return encrypted_password
+
+    def decrypt_password(self, encrypted_password):
+        key = b'aWe0iHTtueNIZY3VJuJwozExOOXCqCd-tUJAUK0KaWI='  # Replace with your secret key
+        cipher_suite = Fernet(key)
+        decrypted_password = cipher_suite.decrypt(encrypted_password).decode()
+        return decrypted_password
  
     # posting function
     def on_post_button_click(self):
