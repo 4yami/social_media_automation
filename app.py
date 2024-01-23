@@ -1,15 +1,35 @@
 import sys
+import logging
+import threading
+import json
+import os
+
+from logging.handlers import TimedRotatingFileHandler
+from datetime import datetime, timedelta
 from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QLineEdit, QPushButton, QListWidget, QTextEdit, QHBoxLayout, QFrame, QFileDialog, QSizePolicy
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
-import threading
-from facebook import post_fb
-import json
 from cryptography.fernet import Fernet
+
+from facebook import post_fb
+
+app_data_directory = os.path.join(os.environ['APPDATA'], 'Social Media Automation')
+os.makedirs(app_data_directory, exist_ok=True)
+config_file_path = os.path.join(app_data_directory, "config.json")
+log_file_path = os.path.join(app_data_directory, 'app.log')
+
+# Configure logging with TimedRotatingFileHandler
+log_handler = TimedRotatingFileHandler(log_file_path, when="midnight", interval=1, backupCount=7)
+log_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s]: %(message)s'))
+logging.getLogger().addHandler(log_handler)
+logging.getLogger().setLevel(logging.INFO)  # Adjust the log level as needed
 
 
 class MainWindow(QMainWindow):
+    """Main window for the Social Media Automation application."""
+    
     def __init__(self):
+        """Initialize the main window."""
         super(MainWindow, self).__init__()
         self.setWindowTitle("Social Media Automation")
         self.groups_list_item = []
@@ -17,8 +37,8 @@ class MainWindow(QMainWindow):
         self.images_path_list = []
         self.init_ui()
         
-
     def init_ui(self):
+        """Initialize the user interface."""
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
@@ -42,6 +62,7 @@ class MainWindow(QMainWindow):
         self.password_input = self.create_text_input(left_layout, True)
         self.groups_label = self.create_label(left_layout, 'Groups URL:')
         self.groups_input = self.create_text_input(left_layout, False)
+        self.groups_input.returnPressed.connect(self.add_link) # connect enter to button
         self.groups_button = self.create_button(left_layout, 'Add URL', self.add_link)
         self.groups_list = self.create_list(left_layout)
 
@@ -88,8 +109,7 @@ class MainWindow(QMainWindow):
           
         # Initialize viewer state
         self.reset_viewer_state()
-        
-        
+           
     # UI functions
     def create_label(self, layout, text):
         label = QLabel(text)
@@ -122,6 +142,7 @@ class MainWindow(QMainWindow):
 
     # Functions
     def add_link(self):
+        """Add a new link to the groups list."""
         new_link = self.groups_input.text()
         
         if new_link:
@@ -130,13 +151,15 @@ class MainWindow(QMainWindow):
                 self.groups_input.clear()
                 self.get_groups_list_item()
             except Exception as e:
-                print(f"Error: {e}")
+                logging.error(f"Error adding link: {e}")
                 
     def get_groups_list_item(self):
+        """Get the list of group items from the UI."""
         self.groups_list_item = [self.groups_list.item(i).text() for i in range(self.groups_list.count())]
         return self.groups_list_item
     
     def edit_link(self):
+        """Edit the selected link in the groups list."""
         selected_item = self.groups_list.currentItem()
         
         if selected_item:
@@ -145,9 +168,10 @@ class MainWindow(QMainWindow):
                 self.groups_input.setText(current_link)
                 self.groups_list.takeItem(self.groups_list.row(selected_item))
             except Exception as e:
-                print(f"Error: {e}")
+                logging.error(f"Error editing link: {e}")
     
     def remove_link(self):
+        """Remove the selected link from the groups list."""
         selected_item = self.groups_list.currentItem()
         
         if selected_item:
@@ -155,75 +179,103 @@ class MainWindow(QMainWindow):
                 self.groups_list.takeItem(self.groups_list.row(selected_item))
                 self.get_groups_list_item()
             except Exception as e:
-                print(f"Error: {e}")
+                logging.error(f"Error removing link: {e}")
              
                 
     # Image function
     def select_image(self):
+        """Open a file dialog to select and add images."""
         file_dialog = QFileDialog(self)
         file_dialog.setNameFilter("Images (*.png *.jpg *.jpeg *.bmp)")
         file_dialog.setFileMode(QFileDialog.ExistingFiles)
 
-        if file_dialog.exec():
-            selected_files = file_dialog.selectedFiles()
-            self.images_path_list.extend(selected_files)
-            self.show_image()
+        try:
+            if file_dialog.exec():
+                selected_files = file_dialog.selectedFiles()
+                self.images_path_list.extend(selected_files)
+                self.show_image()
+        except Exception as e:
+            logging.error(f"Error selecting image: {e}")
 
     def remove_image(self):
-        if self.images_path_list:
-            self.images_path_list.pop(self.current_images_index)
-            if not self.images_path_list:
-                self.reset_viewer_state()
-            else:
-                self.current_images_index = min(self.current_images_index, len(self.images_path_list) - 1)
-            self.show_image()
+        """Remove the currently displayed image."""
+        try:
+            if self.images_path_list:
+                self.images_path_list.pop(self.current_images_index)
+                if not self.images_path_list:
+                    self.reset_viewer_state()
+                else:
+                    self.current_images_index = min(self.current_images_index, len(self.images_path_list) - 1)
+                self.show_image()
+        except Exception as e:
+            logging.error(f"Error removing image: {e}")
 
     def show_previous(self):
+        """Show the previous image in the list."""
         self.current_images_index = (self.current_images_index - 1) % len(self.images_path_list)
         self.show_image()
 
     def show_next(self):
+        """Show the next image in the list."""
         self.current_images_index = (self.current_images_index + 1) % len(self.images_path_list)
         self.show_image()
 
     def show_image(self):
-        if self.images_path_list:
-            pixmap = QPixmap(self.images_path_list[self.current_images_index])
-            scaled_pixmap = pixmap.scaled(
-                self.image_label.size(), 
-                aspectMode=Qt.KeepAspectRatio, 
-                mode=Qt.SmoothTransformation
-            )
-            self.image_label.setPixmap(scaled_pixmap)
-            self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            def update_indicator_label():
-                self.indicator_label.setText(f"image {self.current_images_index + 1}/{len(self.images_path_list)}")
-            update_indicator_label()
+        """Display the currently selected image."""
+        try:
+            if self.images_path_list:
+                pixmap = QPixmap(self.images_path_list[self.current_images_index])
+                scaled_pixmap = pixmap.scaled(
+                    self.image_label.size(),
+                    aspectMode=Qt.KeepAspectRatio,
+                    mode=Qt.SmoothTransformation
+                )
+                self.image_label.setPixmap(scaled_pixmap)
+                self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+                def update_indicator_label():
+                    self.indicator_label.setText(f"image {self.current_images_index + 1}/{len(self.images_path_list)}")
+
+                update_indicator_label()
+        except Exception as e:
+            logging.error(f"Error showing image: {e}")
             
     def reset_viewer_state(self):
+        """Reset the state of the image viewer."""
         self.current_images_index = 0
         self.image_label.clear()
         self.indicator_label.clear()
 
     def resizeEvent(self, event):
+        """Handle the window resize event."""
         super(MainWindow, self).resizeEvent(event)
         self.show_image()
  
     # save text function
     def save_config(self):
+        """Save the current configuration to a JSON file."""
         config_data = {
             'email': self.email_input.text(),
             'password': self.encrypt_password(self.password_input.text()).decode(),
             'group': self.get_groups_list_item(),
         }
 
-        with open('config.json', 'w') as config_file:
-            json.dump(config_data, config_file)
+        try:
+            with open(config_file_path, 'w') as config_file:
+                json.dump(config_data, config_file, indent=2)
+        except Exception as e:
+            logging.error(f"Error saving configuration: {e}")
 
     def load_config(self):
+        """Load the configuration from a JSON file."""
         try:
-            with open('config.json', 'r') as config_file:
+            # Clean up old log files
+            self.cleanup_old_logs()
+            
+            with open(config_file_path, 'r') as config_file:
                 config_data = json.load(config_file)
+
+                # Update UI elements with loaded configuration
                 self.email_input.setText(config_data.get('email', ''))
                 encrypted_password = config_data.get('password', '')
                 self.password_input.setText(self.decrypt_password(encrypted_password))
@@ -232,48 +284,78 @@ class MainWindow(QMainWindow):
                 for link in config_data.get('group', []):
                     self.groups_list.addItem(link)
         except FileNotFoundError:
-            pass  # File not found, it's okay
+            logging.warning("Configuration file not found.")
+        except json.JSONDecodeError as e:
+            logging.error(f"Error decoding JSON in configuration file: {e}")
+        except Exception as e:
+            logging.error(f"Error loading configuration: {e}")
  
+    def cleanup_old_logs(self):
+        """Remove log files older than 7 days."""
+        try:
+            # Iterate over files in the app_data_directory
+            for file_name in os.listdir(app_data_directory):
+                # Check if the file is a compressed log file (ends with '.gz' and starts with 'app.log.20')
+                if file_name.startswith('app.log.20') and file_name.endswith('.gz'):
+                    # Extract the date part from the file name and convert it to a datetime object
+                    log_date_str = file_name.split('.')[-2]
+                    log_date = datetime.strptime(log_date_str, "%Y-%m-%d")
+
+                    # Check if the log file is older than 7 days
+                    if datetime.now() - log_date > timedelta(days=7):
+                        # Remove the log file
+                        os.remove(os.path.join(app_data_directory, file_name))
+        except Exception as e:
+            # Log an error message if an exception occurs during log cleanup
+            logging.error(f"Error cleaning up old logs: {e}")
+
+    
     def encrypt_password(self, password):
-        key = b'aWe0iHTtueNIZY3VJuJwozExOOXCqCd-tUJAUK0KaWI='  # Replace with your secret key
+        """Encrypt the given password using Fernet."""
+        key = b'aWe0iHTtueNIZY3VJuJwozExOOXCqCd-tUJAUK0KaWI='  
         cipher_suite = Fernet(key)
         encrypted_password = cipher_suite.encrypt(password.encode())
         return encrypted_password
 
     def decrypt_password(self, encrypted_password):
-        key = b'aWe0iHTtueNIZY3VJuJwozExOOXCqCd-tUJAUK0KaWI='  # Replace with your secret key
+        """Decrypt the encrypted password using Fernet."""
+        key = b'aWe0iHTtueNIZY3VJuJwozExOOXCqCd-tUJAUK0KaWI='
         cipher_suite = Fernet(key)
         decrypted_password = cipher_suite.decrypt(encrypted_password).decode()
         return decrypted_password
  
     # posting function
     def on_post_button_click(self):
-        self.save_config()
-        """Callback for the 'Start Post' button click."""
-        self.email = self.email_input.text()
-        self.password = self.password_input.text()
-        self.group = self.get_groups_list_item()
-        self.post_text = self.post_text_text_edit.toPlainText()
-        self.converted_images_path = [path.replace('\\', '\\\\') for path in self.images_path_list]
-        # self.save_to_file(self.email, self.password, self.group)
-
-        thread = threading.Thread(target=self.post_to_facebook, args=(self.email, self.password, self.group, self.post_text, self.converted_images_path))
-        thread.start()
+        """Handle the click event of the 'Post' button."""
+        try:
+            self.save_config()
+            self.email = self.email_input.text()
+            self.password = self.password_input.text()
+            self.group = self.get_groups_list_item()
+            self.post_text = self.post_text_text_edit.toPlainText()
+            self.converted_images_path_list = [path.replace('\\', '\\\\') for path in self.images_path_list]
+            thread = threading.Thread(target=self.post_to_facebook, args=(self.email, self.password, self.group, self.post_text, self.converted_images_path_list))
+            thread.start()
+        except Exception as e:
+            logging.error(f"Error preparing post: {e}")
 
     def post_to_facebook(self, email, password, group, post_text, converted_images_path):
-        """Posts to Facebook with provided credentials and text."""
+        """Post content to Facebook using the provided credentials and data."""
         try:
             post_fb(fb_email=email, fb_password=password, fb_group=group, fb_post_text=post_text, fb_files_path=converted_images_path)
         except Exception as e:
-            print(f"Error occurred while posting: {e}")
-            # Consider using logging for more detailed error handling
+            logging.error(f"Error occurred while posting: {e}")
 
 
 def main():
+    """Entry point for the application."""
     app = QApplication(sys.argv)
     window = MainWindow()
     window.showMaximized()
     sys.exit(app.exec())
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logging.error(f"Error in main: {e}")
