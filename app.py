@@ -8,7 +8,7 @@ from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime, timedelta
 from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QLineEdit, QPushButton, QListWidget, QTextEdit, QHBoxLayout, QFrame, QFileDialog, QSizePolicy
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QIcon
 from cryptography.fernet import Fernet
 
 from facebook import post_fb
@@ -32,6 +32,9 @@ class MainWindow(QMainWindow):
         """Initialize the main window."""
         super(MainWindow, self).__init__()
         self.setWindowTitle("Social Media Automation")
+        # Get the directory of the script
+        icon_path = os.path.join(os.path.dirname(sys.argv[0]), 'auto.png')
+        self.setWindowIcon(QIcon(icon_path))
         self.groups_list_item = []
         self.current_images_index = 0
         self.images_path_list = []
