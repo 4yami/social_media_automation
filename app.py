@@ -1,3 +1,5 @@
+# pyinstaller --onefile --windowed --name="Social Media Automation" --icon=auto.ico app.py
+
 import sys
 import logging
 import threading
